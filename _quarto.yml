@@ -3,19 +3,19 @@ project:
   output-dir: _book
 
 book:
-  title: "R for Data Science (2e)"
+  title: "R for Data Science (2e) - Compiled for TU DS 3123"
   reader-mode: true
 
   page-footer:
     left: |
-      R for Data Science (2e) was written by Hadley Wickham, Mine
-      Çetinkaya-Rundel, and Garrett Grolemund.
+      R for Data Science (2e) - Compiled for TU DS 3123 was written by Hadley Wickham, Mine
+      Çetinkaya-Rundel, and Garrett Grolemund, edited by Dale Schoenefeld, and this copy is compiled and hosted by Noah Santa.
     right: |
       This book was built with <a href="https://quarto.org/">Quarto</a>.
   cover-image: cover.jpg
   favicon: cover.jpg
-  site-url: https://r4ds.hadley.nz/
-  repo-url: https://github.com/hadley/r4ds/
+  site-url: https://caspergotlost.github.io/Data-Science-Book/
+  repo-url: https://github.com/caspergotlost/Data-Science-Book.git
   repo-branch: main
   repo-actions: [edit, issue]
   chapters:
