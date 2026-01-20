@@ -1,0 +1,35 @@
+---
+title: "R4DS_2E_arrow"
+author: "Martin"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(arrow)
+```
+
+## Arrow - Using dplyr with arrow
+
+1. Figure out the most popular book each year.
+
+Given that the dataset we'll be looking at is 9GB, I think I'm going to skip over these questions
+
+```{r Most popular book each year}
+
+```
+
+2. Which author has the most books in the Seattle library system?
+
+```{r Most common Seattle library author}
+
+```
+
+3. How has checkouts of books vs ebooks changed over the last 10 years?
+
+```{r Books vs Ebooks overtime}
+
+```
+

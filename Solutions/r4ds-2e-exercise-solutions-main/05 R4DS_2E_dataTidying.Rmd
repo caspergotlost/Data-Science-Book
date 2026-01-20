@@ -1,0 +1,81 @@
+---
+title: "R4DS_2E_dataTidying"
+author: "Martin"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Data tidying - Tidy data
+
+1. For each of the sample tables, describe what each observation and each column represents.
+
+```{r Sample tables}
+table1
+#> # A tibble: 6 × 4
+#>   country      year  cases population
+#>   <chr>       <dbl>  <dbl>      <dbl>
+#> 1 Afghanistan  1999    745   19987071
+#> 2 Afghanistan  2000   2666   20595360
+#> 3 Brazil       1999  37737  172006362
+#> 4 Brazil       2000  80488  174504898
+#> 5 China        1999 212258 1272915272
+#> 6 China        2000 213766 1280428583
+
+# Each column represents a fairly self-explanatory variable. Each observation is a row which represents a specific country, year, number of TB cases and the respective population.
+
+table2
+#> # A tibble: 12 × 4
+#>   country      year type           count
+#>   <chr>       <dbl> <chr>          <dbl>
+#> 1 Afghanistan  1999 cases            745
+#> 2 Afghanistan  1999 population  19987071
+#> 3 Afghanistan  2000 cases           2666
+#> 4 Afghanistan  2000 population  20595360
+#> 5 Brazil       1999 cases          37737
+#> 6 Brazil       1999 population 172006362
+#> # ℹ 6 more row
+
+# Columns country and year are variables. The type column has values of cases and population respectively and the next column count shows the respective count for cases and population from the type column. An observation represents a specific country, year, whether we are looking at cases or population and the repesective count.
+
+table3
+#> # A tibble: 6 × 3
+#>   country      year rate             
+#>   <chr>       <dbl> <chr>            
+#> 1 Afghanistan  1999 745/19987071     
+#> 2 Afghanistan  2000 2666/20595360    
+#> 3 Brazil       1999 37737/172006362  
+#> 4 Brazil       2000 80488/174504898  
+#> 5 China        1999 212258/1272915272
+#> 6 China        2000 213766/1280428583
+
+# Columns country and year are variables. The rate column shows the number of TB cases before `/` and the total population after `/`. An observation represents a specific country, year and the respective number of TB cases and total population in the rate column
+```
+
+2. Sketch out the process you’d use to calculate the rate for table2 and table3. You will need to perform four operations:
+
+- Extract the number of TB cases per country per year.
+- Extract the matching population per country per year.
+- Divide cases by population, and multiply by 10000.
+- Store back in the appropriate place.
+
+You haven’t yet learned all the functions you’d need to actually perform these operations, but you should still be able to think through the transformations you’d need.
+
+```{r Untidy calculations}
+table2_cases <- table2 |> 
+  filter(type == "cases") |> 
+  select(country, year, count)
+table2_pop <- table2 |> 
+  filter(type == "population") |> 
+  select(country, year, count)
+#> table2_pop_cases <- ... # Could use some sort of join to get both cases and population for each respective country and year. This enables us to divide cases by population and multiply by 1000. Then we can map back to table2 with a new added column called "rate". Note that table2 will show the same rate count twice for each respective country and year (similar to the year column)
+
+# For table 3 we could use some sort of regular expression to extract the respective cases before `/` and population after `/` into two new columns. Then we can get the rate as standard.
+
+# Or more simply, for both of the above tables we could pivot them to be in tidy format, which we will see soon.
+```
+

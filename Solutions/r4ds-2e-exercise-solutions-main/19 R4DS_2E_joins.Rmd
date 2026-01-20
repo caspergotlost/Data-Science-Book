@@ -1,0 +1,325 @@
+---
+title: "R4DS_2E_joins"
+author: "Martin"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(nycflights13)
+library(Lahman)
+```
+
+![](https://r4ds.hadley.nz/diagrams/relational.png)
+Figure 1 - Connections between all five data frames in the nycflights13 package. Variables making up a primary key are colored grey, and are connected to their corresponding foreign keys with arrows.
+
+## Joins - Keys
+
+1. We forgot to draw the relationship between weather and airports in Figure 19.1. What is the relationship and how should it appear in the diagram?
+
+Answer: lat-lon-alt can likely identify the origin for weather so there is a relationship there. As weather$time_hour gives the date, time to the nearest hour as well as the time zone its using (EST) we can see a relationship between time_hour and airports tz and tzone, however I don't think we can determine what day it is, thus no relationship exists between time_hour and any variables in airports.
+
+2. weather only contains information for the three origin airports in NYC. If it contained weather records for all airports in the USA, what additional connection would it make to flights?
+
+```{r Additional weather relationship}
+weather |> 
+  count(origin)
+
+flights |> 
+  count(dest)
+# We could now make the additional connection of "origin" to "dest" (We might want to create a seperate column for the three origin airports in NYC and the other airports)
+```
+
+3. The year, month, day, hour, and origin variables almost form a compound key for weather, but there’s one hour that has duplicate observations. Can you figure out what’s special about that hour?
+
+```{r Special hour}
+weather |> 
+  count(year, month, day, hour, origin) |> 
+  filter(n > 1)
+# hour = 1
+
+weather |> 
+  filter(year == 2013, month == 11, day == 3, hour == 1)
+# We have two different rows of information for this particular time for each origin. (Compare it with hour == 2, hour == 3, etc. which only have one). There appear to be differences in temp, humid, wind_dir and wind_speed. Quite frankly I'm not sure why this discrepancy is here. Based on the data its supposed to get hourly meteorological data for LGA, JFK and EWR, so why two observations exist for the same hour at the same airport is beyond me and I can't think of a valid reason for why this is.
+```
+
+4. We know that some days of the year are special and fewer people than usual fly on them (e.g., Christmas eve and Christmas day). How might you represent that data as a data frame? What would be the primary key? How would it connect to the existing data frames?
+
+Answer: We could make a data frame that houses all special days with the following columns. The date (either in ymd or some similar format) or separate columns that represent the date such as year, month, day. And then another column called special_day, in which if its a unique day it will have a corresponding value such as "Christmas Day" if the date is xx/12/25 and similar for other days.
+
+The primary key in this case would be the date column as this can map to many other existing data frames such as flights and weather dataset.
+
+```{r Special days of the year}
+flights |> 
+  mutate(special_day = 
+  case_when(
+    (month == 12 & day == 25) ~ "Christmas Day",
+    (month == 12 & day == 24) ~ "Christmas Eve",
+    .default = "Average Day"
+  )
+  )
+```
+
+5. Draw a diagram illustrating the connections between the Batting, People, and Salaries data frames in the Lahman package. Draw another diagram that shows the relationship between People, Managers, AwardsManagers. How would you characterize the relationship between the Batting, Pitching, and Fielding data frames?
+
+Answer: I'm not particularly in the mood for drawing, so instead I'll try to explain the connections. Lets first look at these datasets.
+
+```{r Lahman connections p1}
+Lahman::Batting
+Lahman::People
+Lahman::Salaries
+# It seems like playerID is common among each of these three datasets. Generally a variable named "playerID" should be unique and hence this is likely a primary key among these datasets.
+
+Batting |> 
+  count(playerID) |> 
+  filter(n > 1)
+# Sadly we see this is not the case.
+# Anyway... it appears playerID is the only connection between these three sets.
+```
+
+```{r Lahman connections p2}
+Lahman::People
+Lahman::Managers
+Lahman::AwardsManagers
+
+# Still only playerID. I'm not going to answer the last part of the question since its fairly open ended and feels poorly worded.
+```
+
+## Joins - Basic joins
+
+1. Find the 48 hours (over the course of the whole year) that have the worst delays. Cross-reference it with the weather data. Can you see any patterns?
+
+```{r Worst 48 hours}
+flights |> 
+  group_by(year, month, day) |> 
+  summarize(avg_delay = mean(arr_delay, na.rm = TRUE)) |> 
+  mutate(lag_delay = avg_delay + lag(avg_delay, default = 0)) |> 
+  filter(!(year == 2013 & month == 1 & day == 1)) |>  # Get rid of this day as this doesn't define a 48 hour period
+  arrange(desc(lag_delay))
+# We can see that 23rd of July 2013 had the worst delay. Which based off our calculation means the 22nd and 23rd were the worst 48 hours in terms of delay. Lets now cross-reference this with the weather data
+
+weather |> 
+  select(year, month, day, temp, dewp, humid, wind_speed, precip, pressure, visib) |> 
+  filter((year == 2013 & month == 7 & day == 23) | (year == 2013 & month == 7 & day == 22))
+# It appears to be generally high wind speeds that are likely causing these high delays.
+```
+
+2. Imagine you’ve found the top 10 most popular destinations using this code:
+
+top_dest <- flights2 |>
+  count(dest, sort = TRUE) |>
+  head(10)
+  
+How can you find all flights to those destinations?
+
+```{r Top 10 destinations}
+flights2 <- flights |> 
+  select(year, time_hour, origin, dest, tailnum, carrier)
+
+top_dest <- flights2 |>
+  count(dest, sort = TRUE) |>
+  head(10)
+
+# Lets use a filtering join like semi_join (All rows in flights that have a match in top_dest will be kept.)
+flights |> 
+  semi_join(top_dest, join_by(dest))
+# This is a dataframe containing all the flights to those top 10 destinations
+```
+
+3. Does every departing flight have corresponding weather data for that hour?
+
+```{r Departing flight corresponding weather?}
+flights |> 
+  filter(!is.na(dep_time)) |>  # Ignore cancelled flights
+  group_by(time_hour) |> 
+  anti_join(weather, join_by(time_hour)) # Lets use an anti-join (All rows in flights that don't have a match in weather are returned)
+# So we see for example, time_hour 2013-10-25 23:00:00 doesn't have corresponding weather data etc.
+
+weather |> 
+  filter(year == 2013, month == 10, day == 25)
+# We can see it doesn't appear
+
+
+```
+
+4. What do the tail numbers that don’t have a matching record in planes have in common? (Hint: one variable explains ~90% of the problems.)
+
+```{r Missing tail numbers}
+missing_tailnum <- flights2 |>
+  anti_join(planes, join_by(tailnum)) |> 
+  distinct(tailnum)
+
+flights |> 
+  filter(tailnum %in% missing_tailnum$tailnum) |> 
+  group_by(carrier) |> 
+  count(carrier)
+# We discovered this in a previous question. When reading the metadata of the planes dataset we get the following line: "American Airways (AA) and Envoy Air (MQ) report fleet numbers rather than tail numbers so can't be matched.". Thus AA and MQ have a bunch of unmatched tail numbers as evidenced below.
+```
+
+5. Add a column to planes that lists every carrier that has flown that plane. You might expect that there’s an implicit relationship between plane and airline, because each plane is flown by a single airline. Confirm or reject this hypothesis using the tools you’ve learned in previous chapters.
+
+```{r Every carrier p1}
+tailnum_carrier <- flights |> 
+  group_by(tailnum, carrier) |> 
+  summarize() |> 
+  ungroup()
+
+# Lets get rid of all the tailnums that are missing from planes (Look above for missing_tailnum)
+tailnum_carrier <- tailnum_carrier |> 
+  filter(!(tailnum %in% missing_tailnum$tailnum))
+
+# Compare the number of rows with the number of rows when we `left_join` planes with tailnum_carrier
+nrow(planes)
+
+tailnum_carrier |> 
+  left_join(planes) |> 
+  nrow()
+# We can see when left joining we have a slightly increased number of rows, likely due to the fact that certain planes were flown by more than 1 carrier.
+
+# Similarly, if a plane is only flown by a single carrier, then there should be a total of 3339 rows with unique tailnums!
+n_distinct(tailnum_carrier$tailnum)
+# In which case there isn't, again we see 3322 rows.
+```
+
+```{r Every carrier p2}
+# Lets go ahead and extract these non distinct tailnums
+non_distinct_tailnums <- tailnum_carrier$tailnum[duplicated(tailnum_carrier$tailnum)]
+
+tailnum_carrier |> 
+  filter(tailnum %in% non_distinct_tailnums)
+# For these tailnums we could collapse these tailnums into one row and carrier could concatenate the carriers together. (e.g., tailnum == "N146PQ" with carrier == "9E, EV"). However this would make plotting this sort of data really annoying so I choose not to do this.
+
+tailnum_carrier |> 
+  left_join(planes)
+# The new column is carrier!
+
+# Overall the hypothesis that each plane is flown by a single airline is disproven.
+```
+
+6. Add the latitude and the longitude of the origin and destination airport to flights. Is it easier to rename the columns before or after the join?
+
+```{r Latitude and longitude}
+flights |> 
+  left_join(airports, join_by(dest == faa)) |> 
+  select(-c(alt, tz, dst, tzone, name)) |> 
+  relocate(lat, lon, dest) |> 
+  rename(
+    "latitude_dest" = lat,
+    "longitude_dest" = lon
+  ) |> 
+  left_join(airports, join_by(origin == faa)) |> 
+  select(-c(alt, tz, dst, tzone, name)) |> 
+  relocate(latitude_dest, longitude_dest, lat, lon, dest, origin) |> 
+  rename(
+    "latitude_origin" = lat,
+    "longitude_origin" = lon
+  )
+
+# Its probably easier to rename the columns after joining, as we want to either first join by destination or origin, and rename these longitude and latitudes appropriately.
+```
+
+7. Compute the average delay by destination, then join on the airports data frame so you can show the spatial distribution of delays. Here’s an easy way to draw a map of the United States:
+
+airports |>
+  semi_join(flights, join_by(faa == dest)) |>
+  ggplot(aes(x = lon, y = lat)) +
+    borders("state") +
+    geom_point() +
+    coord_quickmap()
+    
+You might want to use the size or color of the points to display the average delay for each airport.
+
+```{r Spatial distribution of delays}
+avg_delay <- flights |> 
+  group_by(dest) |> 
+  mutate(avg_delay = mean(arr_delay, na.rm = TRUE)) |> 
+  ungroup()
+
+avg_delay_plane_join <- avg_delay  |> 
+  left_join(airports, join_by(dest == faa))
+
+avg_delay_plane_join |>
+  filter(lon >= -130) |> 
+  ggplot(aes(x = lon, y = lat)) +
+    borders("state") +
+    geom_point(aes(colour = avg_delay, size = avg_delay)) +
+    coord_quickmap()
+# No clue why it takes so long compared to the original map. We can see more delays in destinations just above and to the right of the state of Texas. Less delays in the south of California etc.
+```
+
+8. What happened on June 13 2013? Draw a map of the delays, and then use Google to cross-reference with the weather.
+
+```{r June 13th 2013}
+june_13 <- flights |> 
+  filter(month == 6, day == 13) |> 
+  group_by(dest) |> 
+  mutate(avg_delay = mean(arr_delay, na.rm = TRUE)) |> 
+  ungroup()
+
+airports |>
+  inner_join(june_13, join_by(faa == dest)) |>
+  filter(lon >= -140) |> 
+  ggplot(aes(x = lon, y = lat, size = avg_delay, colour = avg_delay)) +
+    borders("state") +
+    geom_point() +
+    coord_quickmap()
+# Very high delays at the east region of america.
+```
+
+Two derecho series storms occurred in the Eastern region of the United States between the 12th June and 13th June 2013. You can see the general storm's paths in the following image:
+
+![](https://cdn.weatherworksinc.com/blogs/NWS%20Wiki%20Derecho%20with%20Storm%20Reports.png)
+
+Sourced from NOAA
+
+## Joins - Non-equi joins
+
+```{r Non-equi joins setup}
+x <- tribble(
+  ~key, ~val_x,
+     1, "x1",
+     2, "x2",
+     3, "x3"
+)
+y <- tribble(
+  ~key, ~val_y,
+     1, "y1",
+     2, "y2",
+     4, "y3"
+)
+
+parties <- tibble(
+  q = 1:4,
+  party = ymd(c("2022-01-10", "2022-04-04", "2022-07-11", "2022-10-03")),
+  start = ymd(c("2022-01-01", "2022-04-04", "2022-07-11", "2022-10-03")),
+  end = ymd(c("2022-04-03", "2022-07-11", "2022-10-02", "2022-12-31"))
+)
+```
+
+1. Can you explain what’s happening with the keys in this equi join? Why are they different?
+
+```{r Different but similar equi joins}
+x |> full_join(y, join_by(key == key))
+x |> full_join(y, join_by(key == key), keep = TRUE)
+# Since we used `keep = TRUE` we now understand where each key came more explicitly compared to the first line of code. For example we see that x doesn't have a key with a value of 4, only y does. Similarly we see that x has a key with a value of 3 but y doesn't.
+```
+
+2. When finding if any party period overlapped with another party period we used q < q in the join_by()? Why? What happens if you remove this inequality?
+
+```{r q < q}
+# They are referring to the following code, which checks if there is a date overlap:
+parties |> 
+  inner_join(parties, join_by(overlaps(start, end, start, end), q < q)) |> 
+  select(start.x, end.x, start.y, end.y)
+
+# Lets remove the `q < q` and see what happens.
+parties |> 
+  inner_join(parties, join_by(overlaps(start, end, start, end))) |> 
+  select(q.x, start.x, end.x, q.y, start.y, end.y) # Select `q.x` and `q.y` to see whats happening.
+# We see that we can detect an overlap if `q.x` < `q.y` thus we should only print that row.
+
+parties
+```
+

@@ -1,0 +1,197 @@
+---
+title: "R4DS_2E_logicalVectors"
+author: "Martin"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(nycflights13)
+```
+
+## Transform - Comparisons
+
+1.  How does dplyr::near() work? Type near to see the source code. Is sqrt(2)\^2 near 2?
+
+Answer: when typing near we get the following:
+
+function (x, y, tol = .Machine\$double.eps\^0.5) { abs(x - y) \< tol }
+
+So its a function that takes two arguments x & y, calculates the absolute difference between them and sees if its less then the given tol (tolerance) which is a default value of `.Machine$double.eps^0.5` which is the value 1.490116e-08. It is a very small number
+
+```{r How does Near work?}
+sqrt_2 <- sqrt(2)^2
+near(2, sqrt_2)
+# Sqrt(2)^2 is near 2
+```
+
+2. Use mutate(), is.na(), and count() together to describe how the missing values in dep_time, sched_dep_time and dep_delay are connected.
+
+```{r Mutate | is.na | Count}
+NA_flights <- nycflights13::flights |> 
+  mutate(
+    dep_time_miss = is.na(dep_time),
+    sched_dep_time_miss = is.na(sched_dep_time),
+    dep_delay_miss = is.na(dep_delay)
+  )
+
+count(NA_flights, dep_time_miss, sched_dep_time_miss, dep_delay_miss)
+# There seems to be a connection that when the dep_delay is a missing value the dep_time is also a missing value respectively. That makes sense, if the dep_time wasn't recorded, how can we record a dep_delay? all three combined don't appear to be connected
+```
+
+## Transform - Boolean algebra
+
+1. Find all flights where arr_delay is missing but dep_delay is not. Find all flights where neither arr_time nor sched_arr_time are missing, but arr_delay is.
+
+```{r Missing flights}
+flights |> 
+  filter(is.na(arr_delay) & !is.na(dep_delay))
+
+flights |> 
+  filter(!is.na(arr_time) & !is.na(sched_arr_time) & is.na(arr_delay))
+```
+
+2. How many flights have a missing dep_time? What other variables are missing in these rows? What might these rows represent?
+
+```{r Missing departure time}
+flights |> 
+  count(is.na(dep_time))
+# 8255 flights having a missing dep_time
+
+flights |> 
+  filter(is.na(dep_time))
+# For these rows it also looks like dep_delay, arr_time, arr_delay and air_time are all missing respectively. This makes sense if the flights are cancelled.
+```
+
+3. Assuming that a missing dep_time implies that a flight is cancelled, look at the number of cancelled flights per day. Is there a pattern? Is there a connection between the proportion of cancelled flights and the average delay of non-cancelled flights?
+
+```{r Cancelled flights per day p1}
+cancelled_and_delays <- 
+  flights %>%
+  mutate(cancelled = (is.na(arr_delay) | is.na(dep_delay))) %>%
+  group_by(year, month, day) %>%
+  summarise(
+    cancelled_prop = mean(cancelled),
+    avg_dep_delay = mean(dep_delay, na.rm = TRUE),
+    avg_arr_delay = mean(arr_delay, na.rm = TRUE)
+  ) %>%
+  ungroup()
+  
+
+cancelled_flights <- flights |> 
+  mutate(ymd = as.Date(time_hour)) |> 
+  group_by(ymd) |> 
+  count(is.na(dep_time))
+
+cancelled_flights |> 
+  filter(`is.na(dep_time)` == TRUE) |> 
+  ggplot(aes(ymd, n)) +
+  geom_line() +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "1 month") +
+  theme(axis.text.x = element_text(angle = 45))
+# Can't tell if there are that many patterns. I would guess a lot of the days with high numbers of cancelled flights line up with holidays, for example there is generally more cancelled flights in the December Christmas period.
+```
+
+Now time to calculate the average delay of non-cancelled flights per day and the proportion of cancelled flights per day
+
+```{r Cancelled flights per day p2}
+# On a side note. Here I just discovered there is a column called `time_hour` which is essentially what I want.
+flights |> 
+  mutate(ymd = as.Date(time_hour)) |> 
+  group_by(ymd) |> 
+  mutate(avg_delay = mean(dep_delay, na.rm = TRUE)) |> 
+  ggplot(aes(ymd, avg_delay)) +
+  geom_line() +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "1 month") +
+  theme(axis.text.x = element_text(angle = 45))
+# I don't really notice much of a pattern between average delay of cancelled flights and proportion of cancelled flights. But we should plot dep_delay on x-axis and cancelled_prop on y-axis first. There seems to be some positive relationship between increased average departure delay and the proportion of cancelled flights
+
+ggplot(cancelled_and_delays, aes(x = avg_dep_delay, y = cancelled_prop)) +
+  geom_point()
+
+flights |> 
+  mutate(ymd = as.Date(time_hour)) |> 
+  group_by(ymd) |> 
+  summarize(total_flights = n(), canceled_flights = sum(is.na(dep_time))) |> 
+  mutate(cancellation_rate = canceled_flights / total_flights) |> 
+  ggplot(aes(ymd, cancellation_rate)) +
+  geom_line() +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "1 month") +
+  theme(axis.text.x = element_text(angle = 45))
+# So to answer the question: "Is there a pattern?". Yes there is. Number of cancelled flights correlates very heavily to the proportion of cancelled flights a day. Makes sense, the higher the number of flights in a day the more flights on average we should expect to be cancelled. There is also going to be congestion of delays that spill into delaying other flights, which is probably why sometime in early february so many flights were delayed.
+  
+```
+
+## Transform - Summaries
+
+1. What will sum(is.na(x)) tell you? How about mean(is.na(x))?
+
+```{r Sum and Mean of Missing Values}
+# `sum(is.na(x))` will tell us how many values of x are missing, as TRUE == 1 and we are adding up TRUE values
+# `mean(is.na(x))` will instead tell us the proportion of missing values in x. Here is an example:
+
+x <- c(1, NA, 3, NA, 5, 5) # 1/3 of these values are missing values.
+mean(is.na(x)) # we get the correct answer
+```
+
+2. What does prod() return when applied to a logical vector? What logical summary function is it equivalent to? What does min() return when applied to a logical vector? What logical summary function is it equivalent to? Read the documentation and perform a few experiments.
+
+```{r Product and Mimimum}
+x <- c(TRUE, FALSE, TRUE, FALSE)
+prod(x) # If any value of the logical vector is FALSE then it must return 0.
+# This is equivalent to:
+all(x)
+# Since `all` is calculating to sell if all the values of our vector are TRUE.
+
+min(x) # If any value of the logical vector is FALSE then it must return 0.
+# This is again equivalent to:
+all(x)
+
+```
+
+## Transform - Conditional transformations
+
+1. A number is even if it’s divisible by two, which in R you can find out with x %% 2 == 0. Use this fact and if_else() to determine whether each number between 0 and 20 is even or odd.
+
+```{r Odd or even?}
+x <- 0:20
+
+if_else((x %% 2) == 0, "Even", "Odd")
+# Zero is not even or odd so we have to make an exception for this number
+if_else(x == 0, "Zero", 
+        if_else((x %% 2) == 0, "Even", "Odd"))
+```
+
+2. Given a vector of days like x <- c("Monday", "Saturday", "Wednesday"), use an ifelse() statement to label them as weekends or weekdays.
+
+```{r Weekdays or weekends}
+x <- c("Monday", "Saturday", "Wednesday")
+if_else(x %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"), "Weekday", "Weekend")
+```
+
+3. Use ifelse() to compute the absolute value of a numeric vector called x.
+
+```{r Ifelse absolute value}
+x <- -3:3
+ifelse(x >= 0, x, -x)
+```
+
+4. Write a case_when() statement that uses the month and day columns from flights to label a selection of important US holidays (e.g., New Years Day, 4th of July, Thanksgiving, and Christmas). First create a logical column that is either TRUE or FALSE, and then create a character column that either gives the name of the holiday or is NA.
+
+```{r}
+nycflights13::flights |> 
+  mutate(
+    holiday = case_when(
+      (month == 1 & day == 1) ~ "New Years Day",
+      (month == 7 & day == 4) ~ "4th of July",
+      (month == 11 & day == 23) ~ "Thanksgiving",
+      (month == 12 & day == 25) ~ "Christmas",
+      .default = "NA"
+    )
+  ) |> 
+  relocate(year:day, holiday)
+  
+```
+

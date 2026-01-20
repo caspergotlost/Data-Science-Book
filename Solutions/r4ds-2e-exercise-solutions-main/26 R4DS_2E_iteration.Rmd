@@ -1,0 +1,104 @@
+---
+title: "R4DS_2E_iteration"
+author: "Martin"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Iteration - Modifying multiple columns
+
+1. Practice your across() skills by:
+
+  Computing the number of unique values in each column of palmerpenguins::penguins.
+
+  Computing the mean of every column in mtcars.
+
+  Grouping diamonds by cut, clarity, and color then counting the number of observations and computing the mean   of each numeric column.
+  
+```{r Number of unique values in each column}
+palmerpenguins::penguins |>
+  summarize(across(everything(), n_distinct))
+```
+
+```{r Mean of every column}
+mtcars |> 
+  summarize(across(everything(), mean))
+# If any missing values were present we might have had to do the following.
+
+mtcars |> 
+  summarize(across(everything(), \(x) mean(x, na.rm = TRUE)))
+```
+
+```{r Diamonds breakdown}
+diamonds |> 
+  group_by(cut, clarity, color) |> 
+  summarize(
+    across(where(is.numeric), mean),
+    n = n(),
+    .groups = "drop"
+    )
+```
+
+2. What happens if you use a list of functions in across(), but don’t name them? How is the output named?
+
+```{r Unnamed listed functions in across}
+df <- tibble(
+  grp = sample(2, 10, replace = TRUE),
+  a = rnorm(10),
+  b = rnorm(10),
+  c = rnorm(10),
+  d = rnorm(10)
+)
+
+df |> 
+  summarize(across(a:d, list(median, mean)))
+
+df |> 
+  summarize(across(a:d, list(median = median, mean = mean)))
+
+# Each unnamed function takes the position its in for naming columns. So since `median` was the first unnamed function of the list, then output when naming columns treats it as `1` etc.
+```
+
+3. Adjust expand_dates() to automatically remove the date columns after they’ve been expanded. Do you need to embrace any arguments?
+
+```{r Adjusting expand_dates}
+# Lets create another argument with a default of `where(is.Date)` so that our function will now dynamically remove any columns that were originally in date format. Don't forget to embrace this new variable within our function
+expand_dates <- function(df, date = where(is.Date)) {
+  df |> 
+    mutate(
+      across({{ date }}, list(year = year, month = month, day = mday))
+    ) |> 
+    select(-{{ date }})
+}
+
+df_date <- tibble(
+  name = c("Amy", "Bob"),
+  this_is_a_date = ymd(c("2009-08-03", "2010-01-16"))
+)
+
+df_date |> 
+  expand_dates()
+```
+
+4. Explain what each step of the pipeline in this function does. What special feature of where() are we taking advantage of?
+
+```{r What does this function do?}
+show_missing <- function(df, group_vars, summary_vars = everything()) {
+  df |> 
+    group_by(pick({{ group_vars }})) |> # First groups by the selected columns in `group_vars`
+    summarize(
+      across({{ summary_vars }}, \(x) sum(is.na(x))), # Calculates number of missing values for every column
+      .groups = "drop" # Drops the `group_by` selection
+    ) |>
+    select(where(\(x) any(x > 0))) # Selects columns where any of the total missing flights is greater than 0
+# Essentially its selecting all columns that can have a missing value due to cancelled or crashed flights etc.
+# Anyway, the above showcases a special feature of `where` as it can use anonymous functions. Very handy.
+}
+nycflights13::flights |> show_missing(c(year, month, day))
+```
+

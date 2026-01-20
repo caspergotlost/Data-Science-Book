@@ -1,0 +1,141 @@
+---
+title: "R4DS_2E_quarto_codeChunks"
+format: html
+editor: visual
+execute:
+  echo: false
+---
+
+## Quarto - Code Chunks
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+
+smaller <- diamonds |> 
+  filter(carat <= 2.5)
+
+factor_sizes <- diamonds |> 
+  group_by(cut, color, clarity) |> 
+  reframe(carat = round(mean(carat), 2))
+
+comma <- function(x) format(x, digits = 2, big.mark = ",")
+```
+
+We have data about `r nrow(diamonds) |> comma()` diamonds. Only `r nrow(diamonds) - nrow(smaller)` are larger than 2.5 carats. This means that only `r ((nrow(diamonds) - nrow(smaller)) / nrow(diamonds) * 100) |>  comma()`% of diamonds are larger than 2.5 carats. The distribution of the remainder is shown in @fig-smaller-diamonds
+
+```{r}
+#| label: fig-smaller-diamonds
+#| fig-cap: Distribution of diamonds less than or equal to 2.5 carats
+#| fig-width: 10
+#| fig-height: 3
+#| out-width: "20%"
+
+smaller |> 
+  ggplot(aes(x = carat)) + 
+  geom_freqpoly(binwidth = 0.01)
+
+# `out-width` is a percentage of whatever the original output looks like.
+```
+
+Lets take a closer look at the 20 largest diamonds
+
+```{r}
+#| label: biggest-diamonds
+
+diamonds |> 
+  select(carat, depth, x, y, z, price) |> # Selecting only the most important variables
+  arrange(desc(carat)) |> 
+  head(20)
+```
+
+We can see that the dimensions are obviously going to be the most important variables in defining the carat size as they are directly related to each other. Higher prices can also be a general indication into how large the diamond is.
+
+Now lets look at diamond sizes and how they vary by cut, color and clarity
+
+```{r}
+#| label: plot-varying-sizes
+
+ggplot(factor_sizes, aes(x = cut, y = carat, fill = clarity)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~ color) +
+  labs(title = "Diamond Sizes by Cut, Clarity, and Color",
+       x = "Cut",
+       y = "Carat") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+![High quality diamond](https://qs.imgix.net/images/Round_Diamond_Shape_Guide_5x7.png?auto=format&q=60&fit=crop&crop=focalpoint&fp-x=0.5&fp-y=0.5&w=400&h=560){fig-align="center" width="303"}
+
+1.  Open `diamond-sizes.qmd` in the visual editor, insert a code chunk, and add a table with [`knitr::kable()`](https://rdrr.io/pkg/knitr/man/kable.html) that shows the first 5 rows of the `diamonds` data frame
+
+```{r}
+#| label: table-head-diamonds-knitr
+
+diamonds_head <- diamonds |> 
+  head(5)
+
+knitr::kable(diamonds_head, format = "html")
+```
+
+2.  Display the same table with `gt::gt()` instead. See @tbl-head-diamonds-gt
+
+```{r}
+#| label: tbl-head-diamonds-gt
+#| tbl-cap: First 5 rows of the diamonds dataset
+
+gt::gt(diamonds_head)
+
+```
+
+3.  Add a chunk label that starts with the prefix `tbl-` and add a caption to the table with the chunk option `tbl-cap`. Then, edit the text above the code chunk to add a cross-reference to the table with Insert \> Cross Reference.
+
+<!-- -->
+
+1.  Set up a network of chunks where `d` depends on `c` and `b`, and both `b` and `c` depend on `a`. Have each chunk print [`lubridate::now()`](https://lubridate.tidyverse.org/reference/now.html), set `cache: true`, then verify your understanding of caching.
+
+```{r}
+#| label: a
+#| cache: true
+
+time_now <- lubridate::now()
+
+time_now
+
+```
+
+```{r}
+#| label: b
+#| cache: true
+#| dependson: "a"
+
+hour(time_now) <- hour(time_now) + 2
+
+time_now
+
+# Making changes to this chunks calculation will rerun it but not check chunk "a" if we didn't have our dependson argument
+
+```
+
+```{r}
+#| label: c
+#| cache: true
+#| dependson: "a"
+
+lubridate::now()
+
+```
+
+```{r}
+#| label: d
+#| cache: true
+#| dependson: c("c", "b")
+
+lubridate::now()
+
+# Similar pipeline argument can be made to that in chunk "b", but there is now an increasingly complicated hierachy since "d" depends on "c" and "b" which both depend on "a". This can get increasingly more complicated as time goes on.
+
+```

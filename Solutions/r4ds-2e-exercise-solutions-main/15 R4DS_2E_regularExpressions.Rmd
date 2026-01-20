@@ -1,0 +1,288 @@
+---
+title: "R4DS_2E_regularExpressions"
+author: "Martin"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(babynames)
+```
+
+## Regular expressions - Key functions
+
+1. What baby name has the most vowels? What name has the highest proportion of vowels? (Hint: what is the denominator?)
+
+```{r Most number of vowels}
+babynames |> 
+  count(name) |> 
+  mutate(vowels = str_count(name, "[aeiouAEIOU]")) |> 
+  arrange(desc(vowels))
+# Both, Mariadelrosario and Mariaguadalupe have the highest number of vowels at 8.
+
+babynames |> 
+  mutate(
+    name = str_to_lower(name),
+    vowels = str_count(name, "[aeiou]"),
+    consonants = str_count(name, "[^aeiou]"),
+    vow_con_prop = vowels / (consonants + vowels)
+  ) |> 
+  arrange(desc(vow_con_prop)) |> 
+# Apparently there are names "eua", "ea", "ai", "ia", "ii", "aoi", "io", "aia". I'm not one to question the validity of names but these seem like data entry errors. All of the names with a vowel proportion of 100% appear to be data entry errors so I'm going to remove them.
+  filter(vow_con_prop != 1.0)
+# Now we get the names alaiia and amaiia with the highest vowel proportion at 0.833... After doing some googling these appear to be legitimate names
+```
+
+2. Replace all forward slashes in "a/b/c/d/e" with backslashes. What happens if you attempt to undo the transformation by replacing all backslashes with forward slashes? (We’ll discuss the problem very soon.)
+
+```{r Forward and back (Slash)}
+x <- "a/b/c/d/e"
+str_view(x)
+
+x_new <- str_replace_all(x, "/", "\\\\")
+str_view(x_new)
+
+x_new2 <- str_replace_all(x_new, "\\\\", "/")
+str_view(x_new2)
+
+# According to `str_view` everything appears to be as expected when doing the reverse transformation...? Not sure what the problem is.
+```
+
+3. Implement a simple version of str_to_lower() using str_replace_all().
+
+```{r String to lower simple version}
+# I tried doing this in the first edition and got stuck, then led to capturing groups which also didn't really help. So I'm going to complete this in a more obtuse way by effectively doing "A" = "a", "B" = "b" and so on using the inbuilt LETTERS and letters vectors
+x <- "Example TEXT"
+mapping <- setNames(letters, LETTERS)
+str_replace_all(x, mapping)
+# I tried doing this in the first edition and got stuck.
+```
+
+4. Create a regular expression that will match telephone numbers as commonly written in your country.
+
+Answer: sourcing most information from - https://en.wikipedia.org/wiki/Telephone_numbers_in_the_United_Kingdom
+- Prefix for UK numbers is +44
+- Vast majority of UK numbers are 10 digits long if we exclude the ever present zero at the start (Not present if the prefix is used)
+
+If we have a "11 digit" number then we want to shorten it to the 10 digit version as the leading zero is redundant
+
+Honestly not sure why this exercise is here and not later in the book when we learn about "grouping" in regex, which will be necessary for extracting UK phone numbers.
+
+```{r UK telephone numbers}
+sample_numbers <- c("06547834097", "+447851087065", "447851087065", "7640981029")
+
+str_view(sample_numbers, pattern = "(?:\\+44|44|0)\\s?\\d{10}")
+# (?:\+44|44|0): Matches either +44, 44, or 0.
+# \s?: Matches an optional whitespace character.
+# \d{10}: Matches exactly 10 digits.
+```
+
+## Regular expressions - Pattern details
+
+1. How would you match the literal string "'\? How about "$^$"?
+
+```{r Annoying matches}
+x <- "\"\'\\?"
+str_view(x)
+
+str_view(x, "\"\'\\\\\\?")
+# As a backslash and question mark are considered metacharacters in regular expressions, the backslashes need to be doubled. i.e. to represent a literal ? in a regex we need to do \?. Thus in order to match \? we need the string "\\?". Similar argument for representing a literal \ we need \\. Thus in order to match \\ we need the string "\\\\". I think the following example shows it well:
+
+x <- "a\\b"
+str_view(x)
+#> [1] │ a\b - Notice how if we supplied only \\ to the below argument it would be a literal \, which is the escape metacharacter for a regular expression
+str_view(x, "\\\\")
+#> [1] │ a<\>b 
+
+y <- "\"$^$\"?"
+str_view(y)
+
+str_view(y, "\"\\$\\^\\$\"\\?")
+```
+
+2. Explain why each of these patterns don’t match a \: "\", "\\", "\\\".
+
+Answer: 
+- "\" This is simply the escape character. No subsequent metacharacter has been supplied hence it wont work.
+- "\\" As a literal string this is \. So if the regular expression is literally \, i.e. the escape character, this won't work.
+- "\\\" So we have the a literal \ followed by a the escape character \. Much like the first pattern, this won't work as no subsequent metacharacter is being supplied to the escape character \. Both patterns 1 and 3 are not even valid patterns to use as a regular expression since they aren't closed strings.
+
+3. Given the corpus of common words in stringr::words, create regular expressions that find all words that:
+
+
+```{r Finding words using regex}
+# a. Start with “y”
+str_view(stringr::words, "^y")
+
+# b. Don’t start with “y”.
+str_view(stringr::words, "^[^y]") # Naturally, there is a huge list of words that dont start with a y.
+
+# c. End with “x”.
+str_view(stringr::words, "x$")
+
+# d. Are exactly three letters long. (Don’t cheat by using str_length()!)
+str_view(stringr::words, "^(\\w{3})$")
+
+# e. Have seven letters or more.
+str_view(stringr::words, "\\w{7,}")
+
+# f. Contain a vowel-consonant pair.
+str_view(stringr::words, "[aeiou][^aeiou]")
+
+# g. Contain at least two vowel-consonant pairs in a row.
+str_view(stringr::words, "([aeiou][^aeiou])([aeiou][^aeiou])")
+
+# h. Only consist of repeated vowel-consonant pairs.
+str_view(stringr::words, "([aeiou][^aeiou])\\1")
+```
+
+4. Create 11 regular expressions that match the British or American spellings for each of the following words: airplane/aeroplane, aluminum/aluminium, analog/analogue, ass/arse, center/centre, defense/defence, donut/doughnut, gray/grey, modeling/modelling, skeptic/sceptic, summarize/summarise. Try and make the shortest possible regex!
+
+```{r American and English regex}
+x <- c("airplane", "aeroplane", "airiplane")
+str_view(x, "a(i|e)r(o?)plane")
+
+x <- c("aluminum", "aluminium")
+str_view(x, "alumin(i?)um")
+
+x <- c("analog", "analogue")
+str_view(x, "analog(ue)?")
+
+x <- c("ass", "arse")
+str_view(x, "a(r|s)se?")
+
+x <- c("center", "centre", "centrr")
+str_view(x, "cent(er|re)")
+
+x <- c("defense", "defence")
+str_view(x, "defen(se|ce)")
+
+x <- c("donut", "doughnut")
+str_view(x, "do(ugh)?nut")
+
+x <- c("gray", "grey")
+str_view(x, "gr(a|e)y")
+
+x <- c("modeling", "modelling")
+str_view(x, "modell?ing")
+
+x <- c("skeptic", "sceptic")
+str_view(x, "s(k|c)eptic")
+
+x <- c("summarize", "summarise")
+str_view(x, "summari(z|s)e")
+```
+
+5. Switch the first and last letters in words. Which of those strings are still words?
+
+```{r First and last letter swap}
+words_swapped <- str_replace(stringr::words, "^(.)(.)*(.)$", "\\3\\2\\1") |> 
+  str_view()
+
+common_words <- words_swapped[words_swapped %in% words]
+```
+
+6. Describe in words what these regular expressions match: (read carefully to see if each entry is a regular expression or a string that defines a regular expression.)
+
+```{r What does this regex do?}
+# ^.*$ - This is regex, matchs any character at the beginning, zero or more times till the end. It matches anything.
+x <- c("Example", "TTT", "a", "123$$192", "$..19")
+str_view(x, "^.*$")
+
+# "\\{.+\\}" - Regex since we see doubling up of backslashes for metacharacters like {}. It matches anything contained within curly braces, {}.
+x <- c("{Hello}", "{}", "Boo, {Boo}")
+str_view(x, "\\{.+\\}")
+
+# \d{4}-\d{2}-\d{2} - String. For regex we need to double up backslashes of \\d for example. Seems to be an expression to match dates that go Year-Month-Day.
+x <- c("2014-06-06", "2000-05-7", "Test", "18-11-2023", "2023 01 01")
+str_view(x, "\\d{4}-\\d{2}-\\d{2}")
+
+# "\\\\{4}" - Regex. This is testing if a string contains 4 consecutive backslashes in a row.
+x <- c("\\\\\\\\", "\\\\\\\\ \\ \\ \\\\", "Hello", "18-11-2023", "2023 01 01")
+str_view(x, "\\\\{4}")
+
+# \..\..\.. - String. We need to double backslashes up to find a literal '.' in our string for a regular expression. This tests if we get a literal '.' followed by any character, then another ., then any character, a dot again, then any character
+x <- c(".B.O.O", "...? Really now.", "......")
+str_view(x, "\\..\\..\\..")
+
+# (.)\1\1 - String. Need double backslashes for grouping. This is testing for any character that appears three times in a row.
+x <- c("AAA", "999", "Test", "HhH", "BAAAAAA")
+str_view(x, "(.)\\1\\1")
+
+# "(..)\\1" - Regex. Tests if any two characters appear twice in a row.
+x <- c("bababa", "WWWW11xxxx", "123456654321", "12341234")
+str_view(x, "(..)\\1")
+```
+
+7. Solve the beginner regexp crosswords at https://regexcrossword.com/challenges/beginner.
+
+## Regular expressions - Practice
+
+1. For each of the following challenges, try solving it by using both a single regular expression, and a combination of multiple str_detect() calls.
+
+```{r Str_detect and Regex}
+# Find all words that start or end with x.
+str_view(stringr::words, "(^x)|(x$)")
+str_view(words[str_detect(words, "^x") | str_detect(words, "x$")])
+
+# Find all words that start with a vowel and end with a consonant.
+str_view(words, "^[aeiou].*[^aeiou]$")
+str_view(words[str_detect(words, "^[aeiou]") & str_detect(words, "[^aeiou]$")])
+
+# Are there any words that contain at least one of each different vowel?
+# Given that in the book if we use a single regular expression we have to use 120 different patterns to find words that contain all vowels, then to find words that contain at least one of each different vowel then it would also have 120 different patterns which will look like the following:
+words[str_detect(words, "a+.*e+.*i+.*o+.*u+")]
+# ...
+words[str_detect(words, "u+.*o+.*i+.*e+.*a+")]
+# Instead we can do the following:
+str_view(
+  words[
+  str_detect(words, "a+") &
+  str_detect(words, "e+") &
+  str_detect(words, "i+") &
+  str_detect(words, "o+") &
+  str_detect(words, "u+") 
+]
+)
+# No words exist that contain all vowels, so naturally no words exist that contain at least one of each different vowel.
+```
+
+2. Construct patterns to find evidence for and against the rule “i before e except after c”?
+
+```{r Riddle}
+# i before e
+str_view(words[str_detect(words, "ie")])
+# By eyeballing the result we can see the words science and society are evidence against this rule. We could also just do the following pattern:
+str_view(words[str_detect(words, "cie")])
+
+# i before e except after c
+str_view(words[str_detect(words, "[^c]ie")])
+```
+
+3. colors() contains a number of modifiers like “lightgray” and “darkblue”. How could you automatically identify these modifiers? (Think about how you might detect and then remove the colors that are modified).
+
+```{r Modified colours}
+# First lets remove numbered variants:
+cols <- colors()
+cols <- cols[!str_detect(cols, "\\d")]
+str_view(cols)
+# Frankly I'm not sure how to automatically identify these modifiers. We could get some common colours like red, green, blue, white etc. and extract the text before these colours as they would most likely be modifiers.
+basic_cols <- c("white", "blue", "red", "green", "yellow", "pink")
+pattern <- str_c(".+(", str_flatten(basic_cols, "|"), ")")
+cols[str_detect(cols, pattern)]
+# So eyeballing it I can see modifiers like, alice, antique, cadet, cornflower, dark, etc. I could probably figure out how to extract these modifiers, then use that to remove modified colours.
+```
+
+4. Create a regular expression that finds any base R dataset. You can get a list of these datasets via a special use of the data() function: data(package = "datasets")$results[, "Item"]. Note that a number of old datasets are individual vectors; these contain the name of the grouping “data frame” in parentheses, so you’ll need to strip those off.
+
+```{r Find any base R dataset Regex}
+pattern <- str_c("(", 
+                 str_flatten(data(package = "datasets")$results[, "Item"], "|"),
+                 ")")
+
+sample_datasets <- c("AirPassengers", "UKDriverDeaths", "women")
+str_view(sample_datasets, pattern)
+```
+

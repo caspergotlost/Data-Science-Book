@@ -1,0 +1,56 @@
+---
+title: "R4D2_2E_workflowBasics"
+author: "Martin"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Exercises
+
+1. Why does this code not work?
+
+```{r Not working}
+my_variable <- 10
+#my_varıable
+my_variable
+# we spelt my_variable incorrectly so this object does not exist, thus the respective error.
+```
+
+2. Tweak each of the following R commands so that they run correctly:
+
+```{r Tweaking errors}
+# libary(todyverse)
+# ggplot(dTA = mpg) + 
+#   geom_point(maping = aes(x = displ y = hwy)) +
+#   geom_smooth(method = "lm)
+library(tidyverse)
+#ggplot(data = mpg) +
+#  geom_point(mapping = aes(x = displ, y = hwy)) +
+#  geom_smooth(method = "lm")
+ggplot(data = mpg, aes(x = displ, y = hwy)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+```
+
+3. Press Option + Shift + K / Alt + Shift + K. What happens? How can you get to the same place using the menus?
+
+```{r Shortcut - what happens?}
+# Pressing Alt + Shift + K brings up the keyboard shortcut quick reference sheet.
+# You can get to the same place by looking near top left under, `Help > Keyboard Shortcuts Help` from the dropdown
+```
+
+4. Let’s revisit an exercise from the Section 2.6. Run the following lines of code. Which of the two plots is saved as mpg-plot.png? Why?
+
+```{r Which plot is saved?}
+my_bar_plot <- ggplot(mpg, aes(x = class)) +
+  geom_bar()
+my_scatter_plot <- ggplot(mpg, aes(x = cty, y = hwy)) +
+  geom_point()
+ggsave(filename = "mpg-plot.png", plot = my_bar_plot)
+# The plot assigned to `my_bar_plot` will be saved as we specified an argument in the ggsave function called `plot` the value of `my_bar_plot`
+```
+

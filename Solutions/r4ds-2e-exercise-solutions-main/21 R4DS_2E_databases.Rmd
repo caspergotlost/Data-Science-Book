@@ -1,0 +1,69 @@
+---
+title: "R4DS_2E_databases"
+author: "Martin"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(DBI)
+library(dbplyr)
+library(tidyverse)
+library(duckdb)
+```
+
+## Databases - SQL
+
+```{r Database setup}
+con <- DBI::dbConnect(duckdb::duckdb())
+dbWriteTable(con, "flights", nycflights13::flights)
+flights_db <- tbl(con, "flights")
+# Had to do it this way as for whatever reason using "copy_nycflights13" caused it to get stuck in a loop
+```
+
+
+1. What is distinct() translated to? How about head()?
+
+```{r SQL translations}
+flights_db |> 
+  distinct(dest) |> 
+  show_query()
+
+# <SQL>
+# SELECT DISTINCT dest
+# FROM flights
+
+flights_db |> 
+  head(5) |> 
+  show_query()
+
+# <SQL>
+# SELECT *
+# FROM flights
+# LIMIT 5
+```
+
+2. Explain what each of the following SQL queries do and try recreate them using dbplyr.
+
+SELECT * 
+FROM flights
+WHERE dep_delay < arr_delay
+
+SELECT *, distance / (air_time / 60) AS speed
+FROM flights
+
+```{r SQL to dplyr}
+# The first selects all the columns from the flights dataset where departure delay is less than arrival delay. The dplyr equivalent would be:
+
+flights_db |> 
+  filter(dep_delay < arr_delay) |> 
+  show_query()
+
+# The second creates a new column called "speed" using the distance and air_time columns from the flights dataset. The dplyr equivalent would be:
+
+flights_db |> 
+  mutate(speed = distance / (air_time / 60)) |> 
+  show_query()
+```
+

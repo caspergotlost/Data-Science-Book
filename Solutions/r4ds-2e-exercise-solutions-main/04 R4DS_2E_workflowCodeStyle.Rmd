@@ -1,0 +1,45 @@
+---
+title: "R4DS_2E_workflowCodeStyle"
+author: "Martin"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(nycflights13)
+```
+
+## Workflow: Code style - Exercises
+
+1. Restyle the following pipelines following the guidelines above.
+
+```{r Restyling}
+flights|>filter(dest=="IAH")|>group_by(year,month,day)|>summarize(n=n(),
+delay=mean(arr_delay,na.rm=TRUE))|>filter(n>10)
+
+flights|>filter(carrier=="UA",dest%in%c("IAH","HOU"),sched_dep_time>
+0900,sched_arr_time<2000)|>group_by(flight)|>summarize(delay=mean(
+arr_delay,na.rm=TRUE),cancelled=sum(is.na(arr_delay)),n=n())|>filter(n>10)
+
+flights |> 
+  filter(dest == "IAH") |> 
+  group_by(year, month, day) |> 
+  summarize(
+    n = n(),
+    delay = mean(arr_delay, na.rm = TRUE)
+  ) |> 
+  filter(n > 10)
+
+flights |> 
+  filter(carrier == "UA", dest %in% c("IAH", "HOU"), sched_dep_time > 0900, sched_arr_time < 2000) |> 
+  group_by(flight) |> 
+  summarize(
+    delay = mean(arr_delay, na.rm = TRUE),
+    cancelled = sum(is.na(arr_delay)),
+    n = n()
+  ) |> 
+  filter(n > 10)
+# If filter's conditions didn't fit on a single line then it is acceptable to put each logical condition on a single line
+```

@@ -1,0 +1,93 @@
+---
+title: "R4DS_2E_dataImport"
+author: "Martin"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Data Import - Reading data from a file
+
+1. What function would you use to read a file where fields were separated with “|”?
+
+```{r Different delimeter}
+# We would use `read_delim()` which should hopefully automatically guess what the delimeter is. Else we can specify it. Lets take a look at an example:
+
+read_delim(
+  "x|y|z
+  1|2|3",
+  show_col_types = FALSE
+)
+
+
+```
+
+2. Apart from file, skip, and comment, what other arguments do read_csv() and read_tsv() have in common?
+
+```{r Common arguments}
+# According to the documentation, read_csv and read_tsv arguments are identical
+```
+
+3. What are the most important arguments to read_fwf()?
+
+```{r read_fwf Important arguments}
+# Given `read_fwf()` reads in data based on the the width of each field I imagine the most important argument is `col_positions`. It uses `fwf_empty()` to guess the col_positions based on the positions of empty columns.
+```
+
+4. Sometimes strings in a CSV file contain commas. To prevent them from causing problems, they need to be surrounded by a quoting character, like " or '. By default, read_csv() assumes that the quoting character will be ". To read the following text into a data frame, what argument to read_csv() do you need to specify?
+
+```{r Comma in a string. Not delimeter}
+read_csv(
+  file = "x,y\n1,'a,b'",
+  quote = "\'"
+)
+```
+
+5. Identify what is wrong with each of the following inline CSV files. What happens when you run the code?
+
+```{r Incorrect CSV readings}
+read_csv("a,b\n1,2,3\n4,5,6")
+# We have only two variables a & b, but three entries exist on each subsequent row. When running the code, for entries that don't have a respective variable, it puts these entries into the last variable column. They don't have any delimeter between them so the numbers are simply combined e.g. 23, 56.
+
+read_csv("a,b,c\n1,2\n1,2,3,4")
+# Again similar problem to above. The third columns entry on the first row is empty, on the second row, too many values given we have only three variables
+
+read_csv("a,b\n\"1")
+# Gets confused by the delimeter since we have commas seemingly delimiting between a & b, but we also have a double quotation mark.
+
+read_csv("a,b\n1,2\na,b")
+# Not sure what the problem is? I guess the column names are also present in the rows entries which is bad.
+
+read_csv("a;b\n1;3")
+# The likelihood is the delimiter is ";" and not part of a string as `read_csv()` sees it. Instead we might have to use a different read function such as `read_csv2()`
+```
+
+6. Practice referring to non-syntactic names in the following data frame by:
+
+- Extracting the variable called 1.
+- Plotting a scatterplot of 1 vs. 2.
+- Creating a new column called 3, which is 2 divided by 1.
+- Renaming the columns to one, two, and three.
+
+```{r Non-syntactic names}
+annoying <- tibble(
+  `1` = 1:10,
+  `2` = `1` * 2 + rnorm(length(`1`))
+)
+
+annoying$`1`
+
+ggplot(annoying, aes(x = `1`, y = `2`)) +
+  geom_point()
+
+annoying <- annoying |> 
+  mutate(`3` = `2`/`1`)
+
+annoying |> 
+  rename(one = `1`, two = `2`, three = `3`)
+```
+
